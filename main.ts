@@ -1,5 +1,8 @@
 import Fastify from "fastify";
 import mysql, { ResultSetHeader } from "mysql2/promise";
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 interface NewOrder {
   user_id: number;
@@ -14,6 +17,7 @@ interface NewOrder {
 const dbCredentials = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
+  port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : undefined,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
 };
@@ -34,9 +38,24 @@ const marketDataPublisherUrl = `${marketDataPublisherHost}:${marketDataPublisher
 
 const pool = mysql.createPool(dbCredentials);
 
+pool.execute(
+  "CREATE TABLE IF NOT EXISTS new_orders (" +
+    [
+      "secnum INT AUTO_INCREMENT PRIMARY KEY",
+      "user_id INT NOT NULL",
+      "timestamp_ns BIGINT NOT NULL",
+      "price DECIMAL(65, 2) NOT NULL",
+      "symbol VARCHAR(255) NOT NULL",
+      "quantity INT NOT NULL",
+      "order_type VARCHAR(255) NOT NULL",
+      "trader_type VARCHAR(255) NOT NULL",
+    ].join(", ") +
+    ")",
+);
+
 async function insertOrder(newOrder: NewOrder) {
   const query =
-    "INSERT INTO ORDERS (user_id, timestamp_ns, price, symbol, quantity, order_type, trader_type) values (?, ?, ?, ?, ?, ?)";
+    "INSERT INTO new_orders (user_id, timestamp_ns, price, symbol, quantity, order_type, trader_type) values (?, ?, ?, ?, ?, ?, ?)";
   return pool
     .execute<ResultSetHeader>(query, [
       newOrder.user_id,
@@ -59,14 +78,21 @@ async function insertOrder(newOrder: NewOrder) {
         symbol: newOrder.symbol,
         side: newOrder.trader_type,
       };
+      console.log(seqId);
       const data = JSON.stringify(seqOrder);
-      console.log(data);
     });
 }
 
 const fastify = Fastify();
 
-fastify.post<{ Body: NewOrder }>("/", async (request, reply) => {
-  const newOrder = request.body;
+fastify.post<{ Body: string }>("/", async (request, reply) => {
+  const newOrder = JSON.parse(request.body) as NewOrder;
   insertOrder(newOrder);
+});
+
+fastify.listen({ port: 3000 }, (err, addr) => {
+  if (err) {
+    console.error(err);
+    process.exit(1);
+  } else console.log(`Server listening on port: ${addr}`);
 });
