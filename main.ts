@@ -14,8 +14,9 @@ interface NewOrder {
   trader_type: string;
 }
 
+const docker = true;
 const dbCredentials = {
-  host: process.env.DB_HOST,
+  host: docker ? "host.docker.internal" : process.env.DB_HOST,
   user: process.env.DB_USER,
   port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : undefined,
   password: process.env.DB_PASSWORD,
@@ -37,21 +38,22 @@ const marketDataPublisherPath = "";
 const marketDataPublisherUrl = `${marketDataPublisherHost}:${marketDataPublisherPort}/${marketDataPublisherPath}`;
 
 const pool = mysql.createPool(dbCredentials);
-
-pool.execute(
-  "CREATE TABLE IF NOT EXISTS new_orders (" +
-    [
-      "secnum INT AUTO_INCREMENT PRIMARY KEY",
-      "user_id INT NOT NULL",
-      "timestamp_ns BIGINT NOT NULL",
-      "price DECIMAL(65, 2) NOT NULL",
-      "symbol VARCHAR(255) NOT NULL",
-      "quantity INT NOT NULL",
-      "order_type VARCHAR(255) NOT NULL",
-      "trader_type VARCHAR(255) NOT NULL",
-    ].join(", ") +
-    ")",
-);
+pool.execute("DROP TABLE IF EXISTS new_orders").then((_) => {
+  pool.execute(
+    "CREATE TABLE IF NOT EXISTS new_orders (" +
+      [
+        "secnum INT AUTO_INCREMENT PRIMARY KEY",
+        "user_id INT NOT NULL",
+        "timestamp_ns BIGINT NOT NULL",
+        "price DECIMAL(65, 2) NOT NULL",
+        "symbol VARCHAR(255) NOT NULL",
+        "quantity INT NOT NULL",
+        "order_type VARCHAR(255) NOT NULL",
+        "trader_type VARCHAR(255) NOT NULL",
+      ].join(", ") +
+      ")",
+  );
+});
 
 async function insertOrder(newOrder: NewOrder) {
   const query =
@@ -79,18 +81,22 @@ async function insertOrder(newOrder: NewOrder) {
         side: newOrder.trader_type,
       };
       console.log(seqId);
-      const data = JSON.stringify(seqOrder);
     });
 }
 
 const fastify = Fastify();
 
 fastify.post<{ Body: string }>("/", async (request, reply) => {
+  console.log("received order");
   const newOrder = JSON.parse(request.body) as NewOrder;
   insertOrder(newOrder);
 });
 
-fastify.listen({ port: 3000 }, (err, addr) => {
+fastify.get("/", async (request, replyTo) => {
+  replyTo.status(200).send("Server responded");
+});
+
+fastify.listen({ port: 3000, host: "0.0.0.0" }, (err, addr) => {
   if (err) {
     console.error(err);
     process.exit(1);
