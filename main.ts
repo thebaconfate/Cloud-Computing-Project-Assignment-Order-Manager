@@ -38,22 +38,20 @@ const marketDataPublisherPath = "";
 const marketDataPublisherUrl = `${marketDataPublisherHost}:${marketDataPublisherPort}/${marketDataPublisherPath}`;
 
 const pool = mysql.createPool(dbCredentials);
-pool.execute("DROP TABLE IF EXISTS new_orders").then((_) => {
-  pool.execute(
-    "CREATE TABLE IF NOT EXISTS new_orders (" +
-      [
-        "secnum INT AUTO_INCREMENT PRIMARY KEY",
-        "user_id INT NOT NULL",
-        "timestamp_ns BIGINT NOT NULL",
-        "price DECIMAL(65, 2) NOT NULL",
-        "symbol VARCHAR(255) NOT NULL",
-        "quantity INT NOT NULL",
-        "order_type VARCHAR(255) NOT NULL",
-        "trader_type VARCHAR(255) NOT NULL",
-      ].join(", ") +
-      ")",
-  );
-});
+pool.execute(
+  "CREATE TABLE IF NOT EXISTS new_orders (" +
+    [
+      "secnum INT AUTO_INCREMENT PRIMARY KEY",
+      "user_id INT NOT NULL",
+      "timestamp_ns BIGINT NOT NULL",
+      "price DECIMAL(65, 2) NOT NULL",
+      "symbol VARCHAR(255) NOT NULL",
+      "quantity INT NOT NULL",
+      "order_type VARCHAR(255) NOT NULL",
+      "trader_type VARCHAR(255) NOT NULL",
+    ].join(", ") +
+    ")",
+);
 
 async function insertOrder(newOrder: NewOrder) {
   const query =
