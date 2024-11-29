@@ -84,10 +84,18 @@ async function insertOrder(newOrder: NewOrder) {
 
 const fastify = Fastify();
 
-fastify.post<{ Body: string }>("/", async (request, reply) => {
+fastify.post<{ Body: string }>("/", async (request, replyTo) => {
   console.log("received order");
   const newOrder = JSON.parse(request.body) as NewOrder;
-  insertOrder(newOrder).then((id) => console.log(id.secnum));
+  insertOrder(newOrder)
+    .then((id) => {
+      console.log(id.secnum);
+      replyTo.status(201).send();
+    })
+    .catch((e: any) => {
+      console.error(e);
+      replyTo.status(500).send();
+    });
 });
 
 fastify.get("/", async (request, replyTo) => {
