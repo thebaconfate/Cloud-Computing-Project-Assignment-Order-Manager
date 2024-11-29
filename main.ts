@@ -78,7 +78,7 @@ async function insertOrder(newOrder: NewOrder) {
         symbol: newOrder.symbol,
         side: newOrder.trader_type,
       };
-      console.log(seqId);
+      return seqOrder;
     });
 }
 
@@ -87,11 +87,11 @@ const fastify = Fastify();
 fastify.post<{ Body: string }>("/", async (request, reply) => {
   console.log("received order");
   const newOrder = JSON.parse(request.body) as NewOrder;
-  insertOrder(newOrder);
+  insertOrder(newOrder).then((id) => console.log(id.secnum));
 });
 
 fastify.get("/", async (request, replyTo) => {
-  replyTo.status(200).send("Server responded");
+  replyTo.status(200).send("Order manager available");
 });
 
 fastify.listen({ port: 3000, host: "0.0.0.0" }, (err, addr) => {
