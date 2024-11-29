@@ -14,7 +14,7 @@ interface NewOrder {
   trader_type: string;
 }
 
-const docker = true;
+const docker = false; // set to true to debug in a docker network, I don't think it's applicable to k8s though
 const dbCredentials = {
   host: docker ? "host.docker.internal" : process.env.DB_HOST,
   user: process.env.DB_USER,
