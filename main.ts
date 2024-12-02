@@ -39,7 +39,7 @@ const marketDataPublisherUrl = `${marketDataPublisherHost}:${marketDataPublisher
 
 const pool = mysql.createPool(dbCredentials);
 pool.execute(
-  "CREATE TABLE IF NOT EXISTS new_orders (" +
+  "CREATE TABLE IF NOT EXISTS orders (" +
     [
       "secnum INT AUTO_INCREMENT PRIMARY KEY",
       "user_id INT NOT NULL",
@@ -49,6 +49,7 @@ pool.execute(
       "quantity INT NOT NULL",
       "order_type VARCHAR(255) NOT NULL",
       "trader_type VARCHAR(255) NOT NULL",
+      "filled BOOLEAN NOT NULL DEFAULT FALSE",
     ].join(", ") +
     ")",
 );
@@ -90,6 +91,8 @@ fastify.post<{ Body: string }>("/", async (request, replyTo) => {
   insertOrder(newOrder)
     .then((id) => {
       console.log(id.secnum);
+      // TODO: Send to the engine
+      // TODO send to the publisher
       replyTo.status(201).send();
     })
     .catch((e: any) => {
