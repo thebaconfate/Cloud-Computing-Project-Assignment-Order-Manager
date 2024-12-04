@@ -14,9 +14,8 @@ interface NewOrder {
   trader_type: string;
 }
 
-const docker = false; // set to true to debug in a docker network, I don't think it's applicable to k8s though
 const dbCredentials = {
-  host: docker ? "host.docker.internal" : process.env.DB_HOST,
+  host: process.env.DB_HOST,
   user: process.env.DB_USER,
   port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : undefined,
   password: process.env.DB_PASSWORD,
@@ -85,9 +84,8 @@ async function insertOrder(newOrder: NewOrder) {
 
 const fastify = Fastify();
 
-fastify.post<{ Body: string }>("/", async (request, replyTo) => {
-  console.log("received order");
-  const newOrder = JSON.parse(request.body) as NewOrder;
+fastify.post("/", async (request, replyTo) => {
+  const newOrder = request.body as unknown as NewOrder;
   insertOrder(newOrder)
     .then((id) => {
       console.log(id.secnum);
@@ -101,7 +99,7 @@ fastify.post<{ Body: string }>("/", async (request, replyTo) => {
     });
 });
 
-fastify.get("/", async (request, replyTo) => {
+fastify.get("/", async (_, replyTo) => {
   replyTo.status(200).send("Order manager available");
 });
 
