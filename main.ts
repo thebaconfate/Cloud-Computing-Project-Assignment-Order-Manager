@@ -26,36 +26,49 @@ Object.entries(dbCredentials).some((credential) => {
   if (!credential[1]) throw new Error(`Undefined credential ${credential[0]}`);
 });
 
-const engineHost = "";
-const enginePort = 0;
+const engineHost = "matching-engine";
+const enginePort = 3000;
 const enginePath = "";
-const engineUrl = `${engineHost}:${enginePort}/${enginePath}`;
+const engineUrl = (stockname: string) =>
+  `http://${engineHost}-${stockname.toLowerCase()}:${enginePort}/${enginePath}`;
 
 const marketDataPublisherHost = "";
 const marketDataPublisherPort = 0;
 const marketDataPublisherPath = "";
-const marketDataPublisherUrl = `${marketDataPublisherHost}:${marketDataPublisherPort}/${marketDataPublisherPath}`;
+const marketDataPublisherUrl = `http://${marketDataPublisherHost}:${marketDataPublisherPort}/${marketDataPublisherPath}`;
 
 const pool = mysql.createPool(dbCredentials);
-pool.execute(
-  "CREATE TABLE IF NOT EXISTS orders (" +
-    [
-      "secnum INT AUTO_INCREMENT PRIMARY KEY",
-      "user_id INT NOT NULL",
-      "timestamp_ns BIGINT NOT NULL",
-      "price DECIMAL(65, 2) NOT NULL",
-      "symbol VARCHAR(255) NOT NULL",
-      "quantity INT NOT NULL",
-      "order_type VARCHAR(255) NOT NULL",
-      "trader_type VARCHAR(255) NOT NULL",
-      "filled BOOLEAN NOT NULL DEFAULT FALSE",
-    ].join(", ") +
-    ")",
-);
+pool
+  .execute(
+    "CREATE TABLE IF NOT EXISTS orders (" +
+      [
+        "secnum INT AUTO_INCREMENT PRIMARY KEY",
+        "user_id INT NOT NULL",
+        "timestamp_ns BIGINT NOT NULL",
+        "price DECIMAL(65, 2) NOT NULL",
+        "symbol VARCHAR(255) NOT NULL",
+        "quantity INT NOT NULL",
+        "side VARCHAR(255) NOT NULL",
+        "trader_type VARCHAR(255) NOT NULL",
+        "filled BOOLEAN NOT NULL DEFAULT FALSE",
+      ].join(", ") +
+      ")",
+  )
+  .then(() => {
+    pool.execute(
+      "CREATE TABLE IF NOT EXISTS executions (" +
+        [
+          "secnum INT NOT NULL",
+          "quantity INT NOT NULL",
+          "FOREIGN KEY (secnum) REFERENCES orders(secnum)",
+        ].join(", ") +
+        ")",
+    );
+  });
 
 async function insertOrder(newOrder: NewOrder) {
   const query =
-    "INSERT INTO new_orders (user_id, timestamp_ns, price, symbol, quantity, order_type, trader_type) values (?, ?, ?, ?, ?, ?, ?)";
+    "INSERT INTO orders (user_id, timestamp_ns, price, symbol, quantity, side, trader_type) values (?, ?, ?, ?, ?, ?, ?)";
   return pool
     .execute<ResultSetHeader>(query, [
       newOrder.user_id,
@@ -76,7 +89,7 @@ async function insertOrder(newOrder: NewOrder) {
         price: newOrder.price,
         quantity: newOrder.quantity,
         symbol: newOrder.symbol,
-        side: newOrder.trader_type,
+        side: newOrder.order_type,
       };
       return seqOrder;
     });
@@ -87,20 +100,36 @@ const fastify = Fastify();
 fastify.post("/", async (request, replyTo) => {
   const newOrder = request.body as unknown as NewOrder;
   insertOrder(newOrder)
-    .then((id) => {
-      console.log(id.secnum);
-      // TODO: Send to the engine
-      // TODO send to the publisher
-      replyTo.status(201).send();
+    .then((order) => {
+      if (order.symbol === "AAPL") {
+        fetch(engineUrl(order.symbol), {
+          method: "POST",
+          body: JSON.stringify(order),
+          headers: { "Content-Type": "application/json" },
+        }).then((response) => {
+          console.log("Response from engine:");
+          console.log(response);
+          if (response.ok) {
+            switch (response.status) {
+              case 201:
+                console.log("sending to publisher");
+              // response.json().then() ... etc
+              default:
+                replyTo.code(response.status).send();
+                break;
+            }
+          }
+        });
+      }
     })
     .catch((e: any) => {
       console.error(e);
-      replyTo.status(500).send();
+      replyTo.code(500).send();
     });
 });
 
 fastify.get("/", async (_, replyTo) => {
-  replyTo.status(200).send("Order manager available");
+  replyTo.code(200).send("Order manager available");
 });
 
 fastify.listen({ port: 3000, host: "0.0.0.0" }, (err, addr) => {

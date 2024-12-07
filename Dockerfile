@@ -1,4 +1,4 @@
-# Use command: docker build -t client-gateway .
+# Use command: docker build -t <tagname> .
 
 FROM node:20.15
 
