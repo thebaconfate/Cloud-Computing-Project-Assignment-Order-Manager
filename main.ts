@@ -28,14 +28,13 @@ Object.entries(dbCredentials).some((credential) => {
 
 const engineHost = "matching-engine";
 const enginePort = 3000;
-const enginePath = "";
-const engineUrl = (stockname: string) =>
-  `http://${engineHost}-${stockname.toLowerCase()}:${enginePort}/${enginePath}`;
+const enginePath = "order";
+const engineUrl = `http://${engineHost}:${enginePort}/${enginePath}`;
 
-const marketDataPublisherHost = "";
-const marketDataPublisherPort = 0;
-const marketDataPublisherPath = "";
-const marketDataPublisherUrl = `http://${marketDataPublisherHost}:${marketDataPublisherPort}/${marketDataPublisherPath}`;
+const marketDataPublisherHost = "market-data-publisher";
+const marketDataPublisherPort = 3001;
+const marketDataPublisherUrl = (marketDataPublisherPath: string) =>
+  `http://${marketDataPublisherHost}:${marketDataPublisherPort}/${marketDataPublisherPath}`;
 
 const pool = mysql.createPool(dbCredentials);
 pool
@@ -97,35 +96,39 @@ async function insertOrder(newOrder: NewOrder) {
 
 const fastify = Fastify();
 
-fastify.post("/", async (request, replyTo) => {
+fastify.post("/order", async (request, reply) => {
   const newOrder = request.body as unknown as NewOrder;
-  insertOrder(newOrder)
-    .then((order) => {
-      if (order.symbol === "AAPL") {
-        fetch(engineUrl(order.symbol), {
-          method: "POST",
-          body: JSON.stringify(order),
-          headers: { "Content-Type": "application/json" },
-        }).then((response) => {
-          console.log("Response from engine:");
-          console.log(response);
-          if (response.ok) {
-            switch (response.status) {
-              case 201:
-                console.log("sending to publisher");
-              // response.json().then() ... etc
-              default:
-                replyTo.code(response.status).send();
-                break;
-            }
-          }
-        });
-      }
-    })
-    .catch((e: any) => {
-      console.error(e);
-      replyTo.code(500).send();
+  try {
+    const order = await insertOrder(newOrder);
+    const stringifiedOrder = JSON.stringify(order);
+    Promise.allSettled([
+      fetch(engineUrl, {
+        method: "POST",
+        body: stringifiedOrder,
+        headers: { "Content-Type": "application/json" },
+      }),
+      fetch(marketDataPublisherUrl("order"), {
+        method: "POST",
+        body: stringifiedOrder,
+        headers: { "Content-Type": "application/json" },
+      }),
+    ]);
+    reply.code(201).send();
+  } catch (e: any) {
+    console.error(e);
+  }
+});
+
+fastify.post("/order-fill", async (request, _) => {
+  try {
+    await fetch(marketDataPublisherUrl("executions"), {
+      method: "POST",
+      body: JSON.stringify(request.body),
+      headers: { "Content-Type": "application/json" },
     });
+  } catch (e: any) {
+    console.error(e);
+  }
 });
 
 fastify.get("/", async (_, replyTo) => {
@@ -136,5 +139,7 @@ fastify.listen({ port: 3000, host: "0.0.0.0" }, (err, addr) => {
   if (err) {
     console.error(err);
     process.exit(1);
-  } else console.log(`Server listening on port: ${addr}`);
+  } else {
+    console.log(`Server listening on port: ${addr}`);
+  }
 });
