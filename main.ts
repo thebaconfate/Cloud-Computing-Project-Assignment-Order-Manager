@@ -43,7 +43,7 @@ pool
       [
         "secnum INT AUTO_INCREMENT PRIMARY KEY",
         "user_id INT NOT NULL",
-        "timestamp_ns BIGINT NOT NULL",
+        "timestamp DATETIME NOT NULL",
         "price DECIMAL(65, 2) NOT NULL",
         "symbol VARCHAR(255) NOT NULL",
         "quantity INT NOT NULL",
@@ -67,11 +67,11 @@ pool
 
 async function insertOrder(newOrder: NewOrder) {
   const query =
-    "INSERT INTO orders (user_id, timestamp_ns, price, symbol, quantity, side, trader_type) values (?, ?, ?, ?, ?, ?, ?)";
+    "INSERT INTO orders (user_id, timestamp, price, symbol, quantity, side, trader_type) values (?, ?, ?, ?, ?, ?, ?)";
   return pool
     .execute<ResultSetHeader>(query, [
       newOrder.user_id,
-      newOrder.timestamp_ns,
+      new Date(newOrder.timestamp_ns / 1_000_000),
       newOrder.price,
       newOrder.symbol,
       newOrder.quantity,
