@@ -71,7 +71,7 @@ async function insertOrder(newOrder: NewOrder) {
   return pool
     .execute<ResultSetHeader>(query, [
       newOrder.user_id,
-      new Date(newOrder.timestamp_ns / 1_000_000),
+      new Date(),
       newOrder.price,
       newOrder.symbol,
       newOrder.quantity,
