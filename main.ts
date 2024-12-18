@@ -37,46 +37,31 @@ const marketDataPublisherUrl = (marketDataPublisherPath: string) =>
   `http://${marketDataPublisherHost}:${marketDataPublisherPort}/${marketDataPublisherPath}`;
 
 const pool = mysql.createPool(dbCredentials);
-pool
-  .execute(
-    "CREATE TABLE IF NOT EXISTS orders (" +
-      [
-        "secnum INT AUTO_INCREMENT PRIMARY KEY",
-        "user_id INT NOT NULL",
-        "timestamp DATETIME NOT NULL",
-        "price DECIMAL(65, 2) NOT NULL",
-        "symbol VARCHAR(255) NOT NULL",
-        "quantity INT NOT NULL",
-        "side VARCHAR(255) NOT NULL",
-        "trader_type VARCHAR(255) NOT NULL",
-        "filled BOOLEAN NOT NULL DEFAULT FALSE",
-      ].join(", ") +
-      ")",
-  )
-  .then(() => {
-    pool.execute(
-      "CREATE TABLE IF NOT EXISTS executions (" +
-        [
-          "secnum INT NOT NULL",
-          "quantity INT NOT NULL",
-          "FOREIGN KEY (secnum) REFERENCES orders(secnum)",
-        ].join(", ") +
-        ")",
-    );
-  });
+pool.execute(
+  "CREATE TABLE IF NOT EXISTS orders (" +
+    [
+      "secnum INT AUTO_INCREMENT PRIMARY KEY",
+      "timestamp DATETIME NOT NULL",
+      "price DECIMAL(65, 2) NOT NULL",
+      "symbol VARCHAR(255) NOT NULL",
+      "quantity INT NOT NULL",
+      "side VARCHAR(255) NOT NULL",
+      "filled BOOLEAN NOT NULL DEFAULT FALSE",
+    ].join(", ") +
+    ")",
+);
 
 async function insertOrder(newOrder: NewOrder) {
   const query =
-    "INSERT INTO orders (user_id, timestamp, price, symbol, quantity, side, trader_type) values (?, ?, ?, ?, ?, ?, ?)";
+    "INSERT INTO orders (timestamp, price, symbol, quantity, quantity_left, side) values (?, ?, ?, ?, ?, ?)";
   return pool
     .execute<ResultSetHeader>(query, [
-      newOrder.user_id,
       new Date(),
       newOrder.price,
       newOrder.symbol,
       newOrder.quantity,
+      newOrder.quantity,
       newOrder.order_type,
-      newOrder.trader_type,
     ])
     .then((result) => {
       const [rows] = result;
