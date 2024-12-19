@@ -37,19 +37,6 @@ const marketDataPublisherUrl = (marketDataPublisherPath: string) =>
   `http://${marketDataPublisherHost}:${marketDataPublisherPort}/${marketDataPublisherPath}`;
 
 const pool = mysql.createPool(dbCredentials);
-pool.execute(
-  "CREATE TABLE IF NOT EXISTS orders (" +
-    [
-      "secnum INT AUTO_INCREMENT PRIMARY KEY",
-      "timestamp DATETIME NOT NULL",
-      "price DECIMAL(65, 2) NOT NULL",
-      "symbol VARCHAR(255) NOT NULL",
-      "quantity INT NOT NULL",
-      "side VARCHAR(255) NOT NULL",
-      "filled BOOLEAN NOT NULL DEFAULT FALSE",
-    ].join(", ") +
-    ")",
-);
 
 async function insertOrder(newOrder: NewOrder) {
   const query =
@@ -76,6 +63,9 @@ async function insertOrder(newOrder: NewOrder) {
         side: newOrder.order_type,
       };
       return seqOrder;
+    })
+    .catch((e: any) => {
+      console.log(e);
     });
 }
 
